@@ -179,7 +179,7 @@ Let me write explicitly what the structure implies.
 - Coatings: 4 levels
 - 24 observations, then 23 total degrees of freedom (df)
 
-** Whole-plot level**:
+**Whole-plot level**:
 
   - the number of temperature levels subtracted the grand average gives 3 − 1 = 2 df
   - the number of heats minus the number of temperature levels gives 6 − 3 = 3 df, for testing the temperature effect.
