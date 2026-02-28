@@ -1,0 +1,265 @@
+---
+title: "Understanding Split-Plot design: A study notebook"
+author: "Andrea Bazzano"
+format: html
+execute: 
+  echo: true
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: libraries_functions
+
+library(knitr)
+source("R/create_dataset.R")
+```
+
+## Why This Example Stopped Me
+
+Table 9.1 from Box, Hunter & Hunter, presents a study case where the effect of temperature and coating on corrosion resistance has to be studied.
+
+A furnace is set at three different temperatures twice and for each heat setting four differently coated bars were randomly arranged in the furnace.
+
+The authors highlight that setting the furnace temperature accurately was difficult.
+
+I initially thought:
+
+>  This is just a two-factor experiment. Temperature × Coating.
+
+But something felt wrong.
+
+The model ran in R.
+The ANOVA table looked clean but I could not reproduce the results in the book.
+
+This document is my attempt to understand:
+
+- What the actual experimental units are
+- Why this is not a completely randomized design
+- What changes in the ANOVA table
+- What I learned by reconstructing it in R
+
+## Reconstructing the Dataset
+
+The experiment studies corrosion resistance of steel bars:
+
+- Temperature (Temp): 360, 370, 380 °C
+- Coating (Coat): C1–C4
+- Each temperature applied to a furnace run (Heat)
+- Within each heat, four coated bars are tested.
+
+```{r}
+#| label: tbl-dataset
+#| tbl-cap: "Data from table 9.1 in Box, Hunter & Hunter - Statistics for Experimenters, (2005), Design, Innovation and Discovery, Second Edition. `y` is corrosion resistance: the higher, the better."
+
+dataset <- create_dataset()
+knitr::kable(dataset)
+```
+
+At first glance, this looks like a balanced design with three levels for temperature and four for coatings, replicated twice.
+
+But it is not.
+
+## If This Were a Completely Randomized Design
+
+Suppose all 24 observations were independent experimental units.
+
+Then the model would be:
+
+```{r}
+#| label: crd_design
+
+model_crd <- aov(y ~ Temp * Coat, data = dataset)
+anova(model_crd)
+```
+
+This has a great impact on the actual experimental plan:
+
+> The furnace temperature now has to be set 24 times at random, for only a differently coated bar for each run: a very inefficient setup resulting in widely varying estimates because of the difficulty associated to setting the furnace temperature.
+
+With this design:
+
+- Each bar is independently randomized to temperature and coating.
+- There is one common residual error term.
+
+But is that true?
+
+No. The experimental plan described in the textbook is very different.
+
+- Temperature was applied to the entire furnace run.
+- Each coating was tested within each furnace run.
+- The furnace run — not the bar — is the experimental unit for temperature.
+
+Already, something is structurally wrong.
+
+## Identifying the Experimental Units
+
+To clarify, I forced myself to distinguish:
+
+**Unit of observation** → Individual steel bar
+
+**Unit of randomization for Temperature** → Furnace run (Heat)
+
+**Unit of randomization for Coating** → Bar within Heat
+
+This reveals the hierarchy:
+
+```
+Heat
+└── 4 bars (different coatings)
+```
+
+There are two levels of randomization.
+
+Therefore, there must be two error terms.
+
+This is the defining feature of a split-plot design.
+
+## Fitting the Split-Plot Model
+
+In base R, the classical way to represent this structure is:
+
+```{r}
+#| label: split_plot
+
+model_sp <- aov(y ~ Temp * Coat + Error(Heat), data = dataset)
+summary(model_sp)
+```
+
+
+R now separates the analysis into strata:
+
+- Heat stratum (**whole-plot** error)
+- Within stratum (**subplot** error)
+
+Conceptually:
+
+- Temperature is tested against variability between heats
+- Coating and Temperature × Coating  are tested against variability within heats
+- This changes the denominator of the F-tests.
+- And that changes the conclusions.
+
+The variability introduced by setting the furnace temperature is not eliminated.
+It is acknowledged as a separate source of experimental error.
+
+## Comparing the Two Analyses
+
+Let’s compare directly the two designs.
+
+```{r}
+#| label: comparison
+
+summary(model_crd)
+summary(model_sp)
+```
+
+
+In the completely randomized model:
+
+Temperature is tested against the residual mean square
+→ Treating 24 bars as independent for temperature
+
+In the split-plot model:
+
+Temperature is tested against mean square of Heat
+→ Correctly using only between-heat variability
+
+The difference reflects the true replication structure.
+
+I had 8 observations per temperature level, but only 2 independent experimental units.
+
+That realization was the turning point.
+
+## Degrees of Freedom Logic
+
+Let me write explicitly what the structure implies.
+
+- Temperatures: 3 levels
+- Heats: 6 total (2 per temperature)
+- Coatings: 4 levels
+- 24 observations, then 23 total degrees of freedom (df)
+
+** Whole-plot level**:
+
+  - the number of temperature levels subtracted the grand average gives 3 − 1 = 2 df
+  - the number of heats minus the number of temperature levels gives 6 − 3 = 3 df, for testing the temperature effect.
+
+**Subplot level**:
+
+  - the number of coatings gives 4 − 1 = 3 df
+  - the interaction between temperature and coating gives (3 − 1)(4 − 1) = 2 × 3 = 6 df
+  - the total df subtracted of the df for the other terms gives 23 − 14 = 9 df for testing the coating effect and its interaction with temperature.
+
+The CRD model ignores this decomposition and gives:
+
+- Intercept: 1 df
+- Temperature: 2 df
+- Coating: 3 df
+- Interaction: 6 df
+- 24 − 12 = 12 df for testing all the effects.
+
+It borrows precision from the subplots when testing temperature.
+That artificially inflates significance.
+
+The completely randomized model gives 12 residual degrees of freedom.
+The split-plot model gives only 9.
+The missing 3 degrees of freedom correspond exactly to whole-plot variation.
+
+## Why This Is Not a Randomized Block Design
+
+If temperature were a block, this would mean:
+
+- Temperature is not of primary interest and it only serves to remove variability.
+- Coatings would be compared within temperature.
+
+But here:
+
+- Temperature is a treatment factor.
+- Each heat receives only one temperature.
+- Heats are the replicates of temperature.
+- Heat is not blocking temperature.
+- Heat is the experimental unit for temperature.
+
+Confusing these roles changes the denominator of the F-test.
+
+As the authors stated:
+
+> The split-plot is like a randomized block design (with whole plots as blocks) in which the opportunity is taken to introduce additional factors *between blocks*.
+
+A sentence that gave me a lot to think!
+
+## What I Learned
+
+ANOVA is not just mechanics.
+It is inseparable from the data model and the experimental plan.
+That is the source of both its complexity and its flexibility.
+
+Well done, R. A. Fisher.
+
+- The experimental unit determines the correct error term.
+- Split-plot designs arise from constrained randomization.
+- Ignoring hierarchy produces incorrect F-tests.
+- What looks like a simple factorial can hide multiple sources of variation.
+
+Most importantly:
+
+I had been testing temperature against the wrong error term
+without realizing it.
+
+That is not a computational mistake.
+It is a conceptual one.
+
+## Next Step
+
+This classical aov() formulation implicitly reflects a mixed model:
+
+- Temp fixed
+- Heat random
+- Coat fixed within Heat
+
+Understanding this connection is the next conceptual step.
+
+For now, this notebook clarified something essential:
+
+- Split-plot is not a technical complication.
+- It is the statistical consequence of how the experiment was physically run.
