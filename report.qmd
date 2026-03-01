@@ -126,6 +126,11 @@ model_sp <- aov(y ~ Temp * Coat + Error(Heat), data = dataset)
 summary(model_sp)
 ```
 
+`Error(Heat)` tells R that:
+
+- Observations are grouped **within** Heat.
+- Heat represents a **separate** randomization level.
+- Variation **between** heats must be treated as a **distinct error term**.
 
 R now separates the analysis into strata:
 
@@ -142,6 +147,12 @@ Conceptually:
 The variability introduced by setting the furnace temperature is not eliminated.
 It is acknowledged as a separate source of experimental error.
 
+In other words, `Error(Heat)` is not adding Heat as a factor.
+It is defining the randomization structure of the experiment.
+
+It tells R:
+Do not use the same residual term for everything. Respect the hierarchy.
+
 ## Comparing the Two Analyses
 
 Let’s compare directly the two designs.
@@ -154,12 +165,12 @@ summary(model_sp)
 ```
 
 
-In the completely randomized model:
+In the **completely randomized model**:
 
 Temperature is tested against the residual mean square
 → Treating 24 bars as independent for temperature
 
-In the split-plot model:
+In the **split-plot model**:
 
 Temperature is tested against mean square of Heat
 → Correctly using only between-heat variability
@@ -169,6 +180,45 @@ The difference reflects the true replication structure.
 I had 8 observations per temperature level, but only 2 independent experimental units.
 
 That realization was the turning point.
+
+## What the Wrong Model Gets Wrong
+
+The completely randomized analysis leads to a strikingly different conclusion.
+
+Under the **CRD model**:
+
+- Temperature appears highly significant.
+- Coating is not significant.
+- The Temperature × Coating interaction is not significant.
+
+Under the **split-plot model**:
+
+- Temperature is not significant (tested against between-heat variability).
+- Coating is highly significant.
+- The interaction is significant.
+
+This is not a small numerical adjustment.
+
+It is a reversal of the scientific interpretation.
+
+In the **CRD analysis**, the residual mean square pools:
+
+- between-heat variability (difficulty in setting temperature),
+- and within-heat variability (differences between coated bars).
+
+By doing so, it artificially reduces the denominator used to test temperature.
+
+The model is implicitly pretending that we had 8 independent temperature replications per level, when in reality we had only 2.
+
+At the same time, the CRD model inflates the residual variance for coating and the interaction, because it mixes two distinct sources of error into a single term.
+
+The consequence is paradoxical:
+
+- Temperature looks more significant than it truly is.
+- Coating and its interaction lose power.
+- The scientific story changes.
+
+A simple mistake in the `aov()` specification completely alters the conclusions.
 
 ## Degrees of Freedom Logic
 
@@ -251,7 +301,7 @@ It is a conceptual one.
 
 ## Next Step
 
-This classical aov() formulation implicitly reflects a mixed model:
+This classical `aov()` formulation implicitly reflects a mixed model:
 
 - Temp fixed
 - Heat random
