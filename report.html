@@ -384,6 +384,12 @@ Residuals  9   1121   124.5
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
 </div>
 </div>
+<p><code>Error(Heat)</code> tells R that:</p>
+<ul>
+<li>Observations are grouped <strong>within</strong> Heat.</li>
+<li>Heat represents a <strong>separate</strong> randomization level.</li>
+<li>Variation <strong>between</strong> heats must be treated as a <strong>distinct error term</strong>.</li>
+</ul>
 <p>R now separates the analysis into strata:</p>
 <ul>
 <li>Heat stratum (<strong>whole-plot</strong> error)</li>
@@ -397,6 +403,8 @@ Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
 <li>And that changes the conclusions.</li>
 </ul>
 <p>The variability introduced by setting the furnace temperature is not eliminated. It is acknowledged as a separate source of experimental error.</p>
+<p>In other words, <code>Error(Heat)</code> is not adding Heat as a factor. It is defining the randomization structure of the experiment.</p>
+<p>It tells R: Do not use the same residual term for everything. Respect the hierarchy.</p>
 </section>
 <section id="comparing-the-two-analyses" class="level2">
 <h2 class="anchored" data-anchor-id="comparing-the-two-analyses">Comparing the Two Analyses</h2>
@@ -429,13 +437,46 @@ Residuals  9   1121   124.5
 Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
 </div>
 </div>
-<p>In the completely randomized model:</p>
+<p>In the <strong>completely randomized model</strong>:</p>
 <p>Temperature is tested against the residual mean square → Treating 24 bars as independent for temperature</p>
-<p>In the split-plot model:</p>
+<p>In the <strong>split-plot model</strong>:</p>
 <p>Temperature is tested against mean square of Heat → Correctly using only between-heat variability</p>
 <p>The difference reflects the true replication structure.</p>
 <p>I had 8 observations per temperature level, but only 2 independent experimental units.</p>
 <p>That realization was the turning point.</p>
+</section>
+<section id="what-the-wrong-model-gets-wrong" class="level2">
+<h2 class="anchored" data-anchor-id="what-the-wrong-model-gets-wrong">What the Wrong Model Gets Wrong</h2>
+<p>The completely randomized analysis leads to a strikingly different conclusion.</p>
+<p>Under the <strong>CRD model</strong>:</p>
+<ul>
+<li>Temperature appears highly significant.</li>
+<li>Coating is not significant.</li>
+<li>The Temperature × Coating interaction is not significant.</li>
+</ul>
+<p>Under the <strong>split-plot model</strong>:</p>
+<ul>
+<li>Temperature is not significant (tested against between-heat variability).</li>
+<li>Coating is highly significant.</li>
+<li>The interaction is significant.</li>
+</ul>
+<p>This is not a small numerical adjustment.</p>
+<p>It is a reversal of the scientific interpretation.</p>
+<p>In the <strong>CRD analysis</strong>, the residual mean square pools:</p>
+<ul>
+<li>between-heat variability (difficulty in setting temperature),</li>
+<li>and within-heat variability (differences between coated bars).</li>
+</ul>
+<p>By doing so, it artificially reduces the denominator used to test temperature.</p>
+<p>The model is implicitly pretending that we had 8 independent temperature replications per level, when in reality we had only 2.</p>
+<p>At the same time, the CRD model inflates the residual variance for coating and the interaction, because it mixes two distinct sources of error into a single term.</p>
+<p>The consequence is paradoxical:</p>
+<ul>
+<li>Temperature looks more significant than it truly is.</li>
+<li>Coating and its interaction lose power.</li>
+<li>The scientific story changes.</li>
+</ul>
+<p>A simple mistake in the <code>aov()</code> specification completely alters the conclusions.</p>
 </section>
 <section id="degrees-of-freedom-logic" class="level2">
 <h2 class="anchored" data-anchor-id="degrees-of-freedom-logic">Degrees of Freedom Logic</h2>
@@ -506,7 +547,7 @@ Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1</code></pre>
 </section>
 <section id="next-step" class="level2">
 <h2 class="anchored" data-anchor-id="next-step">Next Step</h2>
-<p>This classical aov() formulation implicitly reflects a mixed model:</p>
+<p>This classical <code>aov()</code> formulation implicitly reflects a mixed model:</p>
 <ul>
 <li>Temp fixed</li>
 <li>Heat random</li>
